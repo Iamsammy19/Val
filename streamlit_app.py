@@ -89,6 +89,8 @@ def main():
         st.session_state.time_remaining = 5
     if "start_time" not in st.session_state:
         st.session_state.start_time = None
+    if "answered" not in st.session_state:
+        st.session_state.answered = False  # Track if the user has answered
 
     name = st.text_input("What is your name? (Optional for secret admirer)")
     secret_admirer = st.checkbox("Send as a secret admirer")
@@ -104,34 +106,38 @@ def main():
                 if st.session_state.riddle is None:
                     st.session_state.riddle = get_valentine_riddle()
                     st.session_state.start_time = time.time()
+                    st.session_state.answered = False  # Reset answered state
 
                 st.write(st.session_state.riddle["question"])
 
                 # Calculate remaining time
-                elapsed_time = time.time() - st.session_state.start_time
-                st.session_state.time_remaining = max(0, 5 - elapsed_time)
+                if st.session_state.start_time and not st.session_state.answered:
+                    elapsed_time = time.time() - st.session_state.start_time
+                    st.session_state.time_remaining = max(0, 5 - elapsed_time)
 
-                if st.session_state.time_remaining > 0:
+                if st.session_state.time_remaining > 0 and not st.session_state.answered:
                     user_answer = st.text_input("Your answer:", key="answer_input")
                     st.write(f"Time remaining: {int(st.session_state.time_remaining)} seconds")
 
                     if user_answer:
                         st.session_state.user_answer = user_answer
+                        st.session_state.answered = True  # Mark as answered
                         st.session_state.time_remaining = 0
-                else:
-                    if st.session_state.user_answer:
+
+                        # Check if the answer is correct
                         if st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
                             st.success("Correct! You've entered the giveaway!")
                         else:
-                            st.error("Incorrect. Try again!")
+                            st.error(f"Incorrect. The correct answer is: {st.session_state.riddle['answer']}")
+                else:
+                    if st.session_state.answered:
+                        # Display the result (correct or incorrect)
+                        if st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
+                            st.success("Correct! You've entered the giveaway!")
+                        else:
+                            st.error(f"Incorrect. The correct answer is: {st.session_state.riddle['answer']}")
                     else:
                         st.error("Time's up!")
-
-                    # Reset riddle state
-                    st.session_state.riddle = None
-                    st.session_state.user_answer = ""
-                    st.session_state.time_remaining = 5
-                    st.session_state.start_time = None
 
         else:
             st.error("Please enter your name, check 'Secret Admirer', or enter the Giveaway!")
