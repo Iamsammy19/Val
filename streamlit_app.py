@@ -1,7 +1,6 @@
 import streamlit as st
 import random
-
-   def get_letter_meanings():
+def get_letter_meanings():
        return {
            'A': 'Amazing',
            'B': 'Brilliant',
