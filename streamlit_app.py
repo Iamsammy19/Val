@@ -99,8 +99,8 @@ def main():
 
                 st.write(st.session_state.riddle["question"])
 
-                answer_key = "riddle_answer"
-                time_key = "riddle_time"
+                answer_key = f"riddle_answer_{'active' if st.session_state.time_remaining > 0 else 'inactive'}"
+                time_key = f"riddle_time_{'active' if st.session_state.time_remaining > 0 else 'inactive'}"
 
                 answer_placeholder = st.empty()
                 time_placeholder = st.empty()
