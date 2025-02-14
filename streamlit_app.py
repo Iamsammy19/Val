@@ -92,8 +92,11 @@ def main():
             st.success(message)
 
             if giveaway_entry:
-                riddle = get_valentine_riddle()
-                st.write(riddle["question"])
+                if "riddle" not in st.session_state:
+                    st.session_state.riddle = get_valentine_riddle()
+                    st.session_state.user_answer = ""
+
+                st.write(st.session_state.riddle["question"])
 
                 answer_key = "riddle_answer"
                 time_key = "riddle_time"
@@ -103,23 +106,24 @@ def main():
 
                 start_time = time.time()
                 time_limit = 5
-                user_answer = ""
 
-                while time.time() - start_time <= time_limit:
+                while time.time() - start_time <= time_limit and not st.session_state.user_answer:
                     remaining_time = time_limit - (time.time() - start_time)
                     time_placeholder.write(f"Time remaining: {int(remaining_time)} seconds")
-                    user_answer = answer_placeholder.text_input("Your answer:", key=answer_key)
-                    if user_answer:
-                        break
+                    st.session_state.user_answer = answer_placeholder.text_input("Your answer:", key=answer_key)
                     time.sleep(0.5)
 
                 if time.time() - start_time > time_limit:
                     st.error("Time's up!")
-                elif user_answer.lower() == riddle["answer"].lower():
+                    st.session_state.user_answer = ""
+                elif st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
                     st.success("Correct! You've entered the giveaway!")
                     # (Handle prize distribution)
+                    del st.session_state.riddle
+                    del st.session_state.user_answer
                 else:
                     st.error("Incorrect. Try again!")
+                    st.session_state.user_answer = ""
 
                 time_placeholder.empty()
                 answer_placeholder.empty()
