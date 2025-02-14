@@ -103,19 +103,19 @@ def main():
                 st.empty()  # Clear the message area
                 st.write(st.session_state.riddle["question"])  # Display riddle
 
-                answer_key = f"riddle_answer_{'active' if st.session_state.time_remaining > 0 and not st.session_state.user_answer else 'inactive'}"
-                time_key = f"riddle_time_{'active' if st.session_state.time_remaining > 0 and not st.session_state.user_answer else 'inactive'}"
+                answer_key = f"riddle_answer_{'active' if st.session_state.time_remaining > 0 else 'inactive'}"
+                time_key = f"riddle_time_{'active' if st.session_state.time_remaining > 0 else 'inactive'}"
 
                 answer_placeholder = st.empty()
                 time_placeholder = st.empty()
 
-                if st.session_state.time_remaining > 0 and not st.session_state.user_answer:
+                if st.session_state.time_remaining > 0:  # Corrected condition: Only check time remaining
                     user_answer_input = answer_placeholder.text_input("Your answer:", key=answer_key)
 
                     if user_answer_input:
                          st.session_state.user_answer = user_answer_input
 
-                    if st.session_state.user_answer:
+                    if st.session_state.user_answer: # Stop timer once an answer is entered
                         st.session_state.time_remaining = 0
                     else:
                         st.session_state.time_remaining -= 0.5
