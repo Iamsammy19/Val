@@ -1,5 +1,5 @@
 import streamlit as st
-   import random
+import random
 
    def get_letter_meanings():
        return {
