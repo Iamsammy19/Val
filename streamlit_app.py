@@ -63,6 +63,8 @@ def main():
         st.session_state.start_time = None
     if "answered" not in st.session_state:
         st.session_state.answered = False
+    if "giveaway_entry" not in st.session_state:
+        st.session_state.giveaway_entry = False
 
     # Message Generation Form
     with st.form("message_form"):
@@ -78,37 +80,39 @@ def main():
             st.markdown(message)
 
             if giveaway_entry:
+                st.session_state.giveaway_entry = True
                 if not st.session_state.riddle:
                     st.session_state.riddle = get_valentine_riddle()
                     st.session_state.start_time = time.time()
 
-                st.write("**Riddle Challenge:**")
-                st.write(st.session_state.riddle["question"])
+    # Riddle Challenge (only if giveaway is entered)
+    if st.session_state.giveaway_entry:
+        st.write("**Riddle Challenge:**")
+        st.write(st.session_state.riddle["question"])
 
-                # Riddle Form
-                with st.form("riddle_form"):
-                    if st.session_state.time_remaining > 0 and not st.session_state.answered:
-                        user_answer = st.text_input("Your answer:", key="answer_input")
-                        elapsed_time = time.time() - st.session_state.start_time
-                        st.session_state.time_remaining = max(5 - int(elapsed_time), 0)
-                        st.write(f"Time remaining: {st.session_state.time_remaining} seconds")
-                        submit_riddle = st.form_submit_button("Submit Answer")
+        # Timer logic
+        if not st.session_state.answered:
+            elapsed_time = time.time() - st.session_state.start_time
+            st.session_state.time_remaining = max(5 - int(elapsed_time), 0)
 
-                    elif not st.session_state.answered:
-                        user_answer = st.text_input("Your answer:", key="answer_input")
-                        submit_riddle = st.form_submit_button("Submit Answer")
+            if st.session_state.time_remaining > 0:
+                st.write(f"Time remaining: {st.session_state.time_remaining} seconds")
+            else:
+                st.error("Time's up!")
 
-                if submit_riddle:
-                    st.session_state.user_answer = user_answer
-                    st.session_state.answered = True
-                    st.session_state.time_remaining = 0
+        # Riddle Form
+        with st.form("riddle_form"):
+            user_answer = st.text_input("Your answer:", key="answer_input")
+            submit_riddle = st.form_submit_button("Submit Answer")
 
-                    if st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
-                        st.success("🎉 Correct! You've entered the giveaway!")
-                    else:
-                        st.error(f"❌ Incorrect. The correct answer was: {st.session_state.riddle['answer']}")
-        else:
-            st.error("Please enter your name, check 'Secret Admirer', or enter the Giveaway!")
+        if submit_riddle:
+            st.session_state.user_answer = user_answer
+            st.session_state.answered = True
+
+            if st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
+                st.success("🎉 Correct! You've entered the giveaway!")
+            else:
+                st.error(f"❌ Incorrect. The correct answer was: {st.session_state.riddle['answer']}")
 
 if __name__ == "__main__":
     main()
