@@ -53,7 +53,7 @@ def generate_valentine_message(name):
     ]
 
     valentine_message = (
-        f"Every letter in your name tells me something special about you:\n"
+        f" Every letter in your name tells me something special about you:\n"
         "\n".join(breakdown) +
         f"\n\n{random.choice(messages)}"
     )
