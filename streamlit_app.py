@@ -65,6 +65,8 @@ def main():
         st.session_state.answered = False
     if "giveaway_entry" not in st.session_state:
         st.session_state.giveaway_entry = False
+    if "message_generated" not in st.session_state:
+        st.session_state.message_generated = False
 
     # Message Generation Form
     with st.form("message_form"):
@@ -77,16 +79,22 @@ def main():
         if name or secret_admirer or giveaway_entry:
             display_name = name if name else "My Valentine"
             message = generate_valentine_message(display_name)
+            st.session_state.message_generated = True
+            st.session_state.giveaway_entry = giveaway_entry
+
+            if st.session_state.giveaway_entry:
+                st.session_state.riddle = get_valentine_riddle()
+                st.session_state.start_time = time.time()
+                st.session_state.answered = False
+                st.session_state.user_answer = ""
+                st.session_state.time_remaining = 5
+
             st.markdown(message)
+        else:
+            st.error("Please enter your name, check 'Secret Admirer', or enter the Giveaway!")
 
-            if giveaway_entry:
-                st.session_state.giveaway_entry = True
-                if not st.session_state.riddle:
-                    st.session_state.riddle = get_valentine_riddle()
-                    st.session_state.start_time = time.time()
-
-    # Riddle Challenge (only if giveaway is entered)
-    if st.session_state.giveaway_entry:
+    # Riddle Challenge (only if giveaway is entered and message is generated)
+    if st.session_state.giveaway_entry and st.session_state.message_generated:
         st.write("**Riddle Challenge:**")
         st.write(st.session_state.riddle["question"])
 
@@ -99,6 +107,7 @@ def main():
                 st.write(f"Time remaining: {st.session_state.time_remaining} seconds")
             else:
                 st.error("Time's up!")
+                st.session_state.answered = True
 
         # Riddle Form
         with st.form("riddle_form"):
