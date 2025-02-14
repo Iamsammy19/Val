@@ -119,7 +119,7 @@ def main():
                     user_answer = st.text_input("Your answer:", key="answer_input")
                     st.write(f"Time remaining: {int(st.session_state.time_remaining)} seconds")
 
-                    if user_answer:
+                    if st.button("Submit Answer"):  # Submit button
                         st.session_state.user_answer = user_answer
                         st.session_state.answered = True  # Mark as answered
                         st.session_state.time_remaining = 0
