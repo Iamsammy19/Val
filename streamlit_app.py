@@ -123,21 +123,21 @@ def main():
                         st.session_state.user_answer = user_answer
                         st.session_state.answered = True  # Mark as answered
                         st.session_state.time_remaining = 0
+                elif not st.session_state.answered:  # Show submit button even if time is up, but not answered
+                    user_answer = st.text_input("Your answer:", key="answer_input")  # Get user input
+                    if st.button("Submit Answer"):  # Submit button
+                        st.session_state.user_answer = user_answer
+                        st.session_state.answered = True
+                        st.session_state.time_remaining = 0
 
-                        # Check if the answer is correct
-                        if st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
-                            st.success("Correct! You've entered the giveaway!")
-                        else:
-                            st.error(f"Incorrect. The correct answer is: {st.session_state.riddle['answer']}")
-                else:
-                    if st.session_state.answered:
-                        # Display the result (correct or incorrect)
-                        if st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
-                            st.success("Correct! You've entered the giveaway!")
-                        else:
-                            st.error(f"Incorrect. The correct answer is: {st.session_state.riddle['answer']}")
+                # Display the result (correct or incorrect)
+                if st.session_state.answered:
+                    if st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
+                        st.success("Correct! You've entered the giveaway!")
                     else:
-                        st.error("Time's up!")
+                        st.error(f"Incorrect. The correct answer is: {st.session_state.riddle['answer']}")
+                elif st.session_state.time_remaining <= 0:
+                    st.error("Time's up!")
 
         else:
             st.error("Please enter your name, check 'Secret Admirer', or enter the Giveaway!")
