@@ -95,6 +95,7 @@ def main():
                 if "riddle" not in st.session_state:
                     st.session_state.riddle = get_valentine_riddle()
                     st.session_state.user_answer = ""
+                    st.session_state.time_remaining = 5
 
                 st.write(st.session_state.riddle["question"])
 
@@ -104,26 +105,34 @@ def main():
                 answer_placeholder = st.empty()
                 time_placeholder = st.empty()
 
-                start_time = time.time()
-                time_limit = 5
 
-                while time.time() - start_time <= time_limit and not st.session_state.user_answer:
-                    remaining_time = time_limit - (time.time() - start_time)
-                    time_placeholder.write(f"Time remaining: {int(remaining_time)} seconds")
-                    st.session_state.user_answer = answer_placeholder.text_input("Your answer:", key=answer_key)
-                    time.sleep(0.5)
+                if st.session_state.time_remaining > 0 and not st.session_state.user_answer:
+                    user_answer_input = answer_placeholder.text_input("Your answer:", key=answer_key)
 
-                if time.time() - start_time > time_limit:
+                    if user_answer_input:
+                         st.session_state.user_answer = user_answer_input
+
+                    if st.session_state.user_answer:
+                        st.session_state.time_remaining = 0
+                    else:
+                        st.session_state.time_remaining -= 0.5
+                        time.sleep(0.5)
+
+                    time_placeholder.write(f"Time remaining: {int(max(0, st.session_state.time_remaining))} seconds")
+
+                if st.session_state.time_remaining <= 0 and not st.session_state.user_answer:
                     st.error("Time's up!")
                     st.session_state.user_answer = ""
+                    st.session_state.time_remaining = 5
                 elif st.session_state.user_answer.lower() == st.session_state.riddle["answer"].lower():
                     st.success("Correct! You've entered the giveaway!")
-                    # (Handle prize distribution)
                     del st.session_state.riddle
                     del st.session_state.user_answer
-                else:
+                    st.session_state.time_remaining = 5
+                elif st.session_state.user_answer and st.session_state.user_answer.lower() != st.session_state.riddle["answer"].lower():
                     st.error("Incorrect. Try again!")
                     st.session_state.user_answer = ""
+                    st.session_state.time_remaining = 5
 
                 time_placeholder.empty()
                 answer_placeholder.empty()
