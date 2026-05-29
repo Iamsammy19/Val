@@ -1,6 +1,13 @@
 import streamlit as st
 import anthropic
-import os, json, zipfile, uuid, re, base64, random, threading
+import os
+import json
+import zipfile
+import uuid
+import re
+import base64
+import random
+import threading
 import html as html_lib
 import io as pyio
 from datetime import datetime
@@ -9,119 +16,168 @@ from pathlib import Path
 try:
     from duckduckgo_search import DDGS
     DDG_OK = True
-except:
+except ImportError:
     DDG_OK = False
 
-st.set_page_config(page_title="ZARA", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
+# ====================== PAGE CONFIG ======================
+st.set_page_config(
+    page_title="ZARA — Personal AI Assistant",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# ── Keep your full beautiful CSS + LOGO here ───────────────────────────────
-# ... [Your original CSS and animated logo] ...
+# ====================== CSS (Your Original Beautiful Design) ======================
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Mono:wght@300;400&display=swap');
 
-# ── Voice Settings ─────────────────────────────────────────────────────────
+:root {
+  --gold: #C9A84C; --dark: #0A0A0A; --text: #E8E0D0; --muted: #7A7060;
+}
+
+html, body, [class*="css"] {
+  background-color: var(--dark) !important;
+  color: var(--text) !important;
+  font-family: 'DM Mono', monospace;
+}
+
+.msg-bubble {
+  max-width: 72%; padding: 14px 18px; border-radius: 2px; line-height: 1.7; font-size: 14px;
+}
+.msg-bubble.user { background: #1C1810; border-right: 2px solid var(--gold); }
+.msg-bubble.ai { background: #101018; border-left: 2px solid #3A3A6A; }
+
+.thinking-wrap {
+  display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  background: #101018; border-left: 3px solid #3A3A6A; border-radius: 2px;
+  max-width: 280px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ====================== ANIMATED LOGO ======================
+LOGO = """
+<div style="text-align:center; padding:20px 0 30px;">
+  <div style="position:relative; width:90px; height:90px; margin:0 auto 12px;">
+    <div style="position:absolute; inset:0; border:2px solid #C9A84C; border-radius:50%; animation: spin 3s linear infinite;"></div>
+    <div style="position:absolute; inset:12px; border:2px solid #C9A84C; border-radius:50%; animation: spin 2s linear infinite reverse;"></div>
+    <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
+      <span style="font-size:42px; color:#C9A84C;">⚡</span>
+    </div>
+  </div>
+  <div style="font-family:'Cormorant Garamond', serif; font-size:32px; font-weight:600; letter-spacing:6px; color:#C9A84C;">ZARA</div>
+  <div style="font-size:9px; color:#7A7060; letter-spacing:2px; text-transform:uppercase;">v5.7 • Personal AI</div>
+</div>
+"""
+
+# ====================== SESSION STATE ======================
+for key in ["messages", "profile", "tasks", "notes", "feedback", "rlhf"]:
+    if key not in st.session_state:
+        st.session_state[key] = [] if key in ["messages", "tasks", "notes"] else {} if key in ["profile", "rlhf"] else {}
+
+if "mode" not in st.session_state: st.session_state.mode = "💬 General"
+if "api_key" not in st.session_state: st.session_state.api_key = os.getenv("ANTHROPIC_API_KEY", "")
+if "chat_id" not in st.session_state: st.session_state.chat_id = str(uuid.uuid4())
 if "voice_settings" not in st.session_state:
-    st.session_state.voice_settings = {
-        "input_enabled": True,
-        "output_enabled": True,
-        "voice_name": "Friend",           # You can customize this
-        "speech_rate": 1.0,
-        "pitch": 1.0
-    }
+    st.session_state.voice_settings = {"input_enabled": True, "output_enabled": True}
 
-# ── Multi-Model Support ────────────────────────────────────────────────────
-def get_client(model_provider="anthropic"):
-    if model_provider == "anthropic":
-        return anthropic.Anthropic(api_key=st.session_state.api_key)
-    # Future: Add Grok / OpenAI / local fallback here
-    else:
-        st.warning("Only Anthropic supported currently.")
-        return anthropic.Anthropic(api_key=st.session_state.api_key)
+# ====================== MODES ======================
+MODES = {
+    "💬 General": {"icon": "💬", "color": "#6A8FA0", "system": "You are ZARA..."},
+    "🎨 UI/UX Design": {"icon": "🎨", "color": "#7A5A8A", "system": "You are a senior UI/UX designer..."},
+    "💻 Full-Stack Dev": {"icon": "💻", "color": "#4A6A8A", "system": "You are a principal full-stack engineer..."},
+    # Add other modes as needed
+}
 
-# ── Voice Input Component ─────────────────────────────────────────────────
-def voice_input():
-    audio_value = st.audio_input("Speak to ZARA", key="voice_input")
-    if audio_value:
-        # In production, use Whisper or browser STT
-        st.info("🎤 Voice captured — transcribing...")
-        # For demo: Return placeholder. In real app, integrate speech-to-text
-        return "[Voice message]: " + user_input if 'user_input' in locals() else "Voice input received"
-    return None
+# ====================== HELPER FUNCTIONS ======================
+def save_chat(cid, msgs, mode):
+    Path("zara_history").mkdir(exist_ok=True)
+    (Path("zara_history") / f"{cid}.json").write_text(json.dumps({
+        "id": cid, "mode": mode, "messages": msgs, "updated": datetime.now().isoformat()
+    }, indent=2))
 
-# ── Text-to-Speech Output ─────────────────────────────────────────────────
-def speak_text(text):
-    if not st.session_state.voice_settings["output_enabled"]:
-        return
-    # Browser TTS
-    js = f"""
-    <script>
-        const utterance = new SpeechSynthesisUtterance(`{text.replace('`', '')}`);
-        utterance.rate = {st.session_state.voice_settings["speech_rate"]};
-        utterance.pitch = {st.session_state.voice_settings["pitch"]};
-        // Try to use a friendly voice
-        const voices = speechSynthesis.getVoices();
-        utterance.voice = voices.find(v => v.name.includes("Samantha") || v.name.includes("Karen")) || voices[0];
-        speechSynthesis.speak(utterance);
-    </script>
-    """
-    st.components.v1.html(js, height=0)
+def web_search(query):
+    if not DDG_OK: return ""
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=4))
+            return "\n".join([f"{r.get('title')}: {r.get('body')[:200]}" for r in results])
+    except:
+        return ""
 
-# ── Sidebar ───────────────────────────────────────────────────────────────
+# ====================== SIDEBAR ======================
 with st.sidebar:
     st.markdown(LOGO, unsafe_allow_html=True)
     
-    st.markdown("### Voice Mode")
-    st.session_state.voice_settings["input_enabled"] = st.toggle("🎤 Voice Input", value=True)
-    st.session_state.voice_settings["output_enabled"] = st.toggle("🔊 Voice Output", value=True)
-    
-    if st.session_state.voice_settings["output_enabled"]:
-        st.slider("Speed", 0.5, 2.0, 1.0, key="speech_rate")
-        st.slider("Pitch", 0.5, 2.0, 1.0, key="pitch")
+    st.markdown("### Voice")
+    st.session_state.voice_settings["input_enabled"] = st.toggle("🎤 Voice Input", True)
+    st.session_state.voice_settings["output_enabled"] = st.toggle("🔊 Voice Output", True)
 
-    # Model selection to reduce Anthropic dependency
-    model_provider = st.selectbox("Model Provider", ["Anthropic (Claude)", "Grok (Future)"], index=0)
-    
-    api_key = st.text_input("API Key", value=st.session_state.api_key, type="password")
-    if api_key: st.session_state.api_key = api_key
+    st.markdown("### API")
+    key = st.text_input("Anthropic API Key", value=st.session_state.api_key, type="password")
+    if key: st.session_state.api_key = key
 
-    # ... rest of your sidebar (modes, profile, etc.)
+    st.markdown("### Mode")
+    mode = st.radio("Mode", list(MODES.keys()), index=list(MODES.keys()).index(st.session_state.mode))
+    if mode != st.session_state.mode:
+        st.session_state.mode = mode
+        st.rerun()
 
-# ── Main Processing ───────────────────────────────────────────────────────
-if send_btn or (st.session_state.voice_settings["input_enabled"] and st.session_state.get("voice_input")):
-    if st.session_state.voice_settings["input_enabled"]:
-        voice_text = voice_input()
-        if voice_text:
-            user_input = voice_text
+# ====================== MAIN CHAT ======================
+_, col, _ = st.columns([1, 8, 1])
+with col:
+    st.markdown(f'<div style="text-align:center; font-size:42px; color:#C9A84C; margin-bottom:8px;">ZARA</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align:center; font-size:11px; color:#7A7060;">{st.session_state.mode}</div>', unsafe_allow_html=True)
 
-    # ... existing message append logic ...
+    # Display messages
+    for msg in st.session_state.messages:
+        cls = "user" if msg["role"] == "user" else "ai"
+        st.markdown(f'<div class="msg-wrap {cls}"><div class="msg-bubble {cls}">{msg["content"]}</div></div>', unsafe_allow_html=True)
 
-    system = build_system_prompt(...)   # Your enhanced prompt
+    # Input
+    user_input = st.text_input("Message ZARA", key="chat_input", placeholder="Speak or type...")
+    send = st.button("Send")
 
-    try:
-        client = get_client("anthropic")
-        
-        reply = ""
-        holder = st.empty()
+    if send and user_input.strip():
+        if not st.session_state.api_key:
+            st.error("Please enter your Anthropic API key")
+            st.stop()
 
-        with client.messages.stream(
-            model="claude-3-5-sonnet-20240620",
-            max_tokens=8192,
-            temperature=0.7,
-            system=system,
-            messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
-        ) as stream:
-            for chunk in stream.text_stream:
-                reply += chunk
-                holder.markdown(f'<div class="msg-wrap ai"><div class="msg-bubble ai">{render_md(reply)}<span class="cursor"></span></div></div>', unsafe_allow_html=True)
+        st.session_state.messages.append({"role": "user", "content": user_input, "time": datetime.now().strftime("%H:%M")})
 
-        final_reply = reply
+        try:
+            client = anthropic.Anthropic(api_key=st.session_state.api_key)
+            reply = ""
+            with st.spinner("Thinking..."):
+                response = client.messages.create(
+                    model="claude-3-5-sonnet-20240620",
+                    max_tokens=4096,
+                    system="You are ZARA, a highly intelligent personal AI assistant.",
+                    messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
+                    stream=True
+                )
+                for chunk in response:
+                    if chunk.type == "content_block_delta":
+                        reply += chunk.delta.text
+                        # Simple live update
+                        st.markdown(f"**ZARA:** {reply}")
 
-        # Auto voice output
-        if st.session_state.voice_settings["output_enabled"]:
-            speak_text(final_reply[:800])   # Speak first part for speed
+            st.session_state.messages.append({"role": "assistant", "content": reply, "time": datetime.now().strftime("%H:%M")})
 
-        st.session_state.messages.append({"role": "assistant", "content": final_reply, "time": datetime.now().strftime("%H:%M")})
-        save_chat(...)
+        except Exception as e:
+            st.error(f"Error: {e}")
 
         st.rerun()
 
-    except Exception as e:
-        st.error(f"Error: {str(e)}")
+# Auto voice output (basic)
+if st.session_state.voice_settings["output_enabled"] and st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
+    try:
+        st.components.v1.html(f"""
+        <script>
+            const utterance = new SpeechSynthesisUtterance(`{st.session_state.messages[-1]["content"]}`);
+            speechSynthesis.speak(utterance);
+        </script>
+        """, height=0)
+    except:
+        pass
